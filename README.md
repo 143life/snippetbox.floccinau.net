@@ -46,7 +46,21 @@ cd snippetbox
 
 1. Start the web server:
 ```bash
-go run main.go
+go run ./cmd/web
+```
+or with command-line flags. For see flags use:
+```bash
+go run ./cmd/web -help
+```
+
+example:
+```bash
+go run ./cmd/web -addr=":4000"
+```
+
+Redirect the stdout and stderr streams on disk-files when starting application:
+```bash
+go run ./cmd/web >>./log/info.log 2>>./log/error.log
 ```
 
 2. Open your browser and navigate to:
