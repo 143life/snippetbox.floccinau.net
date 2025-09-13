@@ -51,11 +51,22 @@ func main() {
 	mux.HandleFunc("/snippet/create", snippetCreate)
 	mux.HandleFunc("/snippet/view", snippetView)
 
+	// Chapter 3.2: The http.Server error log
+	// Initialize a new http.Server struct. We set the Addr and Handler fields so
+	// that the server uses the same network address and routes before, and set
+	// the ErrorLog field so that the server now uses the custom errorLog logger in
+	// the event of any problems.
+	srv := &http.Server{
+		Addr:     *addr,
+		ErrorLog: errorLog,
+		Handler:  mux,
+	}
+
 	// The value returned from the flag.String() is a pointer to the flag
 	// value, not the value itself. So we need to dereference the pointer (i.e.
 	// prefix it with the * symbol) before using it. Note that we're using the
 	// log.Printf() function to interpolate the address with the log message.
 	infoLog.Printf("Starting server on %s", *addr)
-	err := http.ListenAndServe(*addr, mux)
+	err := srv.ListenAndServe()
 	errorLog.Fatal(err)
 }
