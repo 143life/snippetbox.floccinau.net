@@ -7,6 +7,14 @@ import (
 	"os"
 )
 
+// Define an application struct to hold the application-wide dependencies for the
+// web application. For now we'll only include fields for the two custom loggers, but
+// we'll add more to it as the build progresses.
+type application struct {
+	errorLog *log.Logger
+	infoLog  *log.Logger
+}
+
 func main() {
 	// Chapter 3.1: Command-line flags
 	// Define a new command-line flag with the name 'addr', a default value of ":4000"
@@ -34,6 +42,17 @@ func main() {
 	// file name and line number.
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
+	// Chapter 3.3: Dependency injection
+	// Initialize a new instance of our application struct, containing the
+	// dependencies.
+	app := &application{
+		errorLog: errorLog,
+		infoLog:  infoLog,
+	}
+
+	// Chapter 3.3: Dependency injection
+	// Swap the route declarations to use the application struct's methods as the
+	// handler functions.
 	mux := http.NewServeMux()
 
 	// Create a file server which serves files out of the "./ui/static" directory.
@@ -47,9 +66,9 @@ func main() {
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
 
 	// Register the other application routes as normal.
-	mux.HandleFunc("/", home)
-	mux.HandleFunc("/snippet/create", snippetCreate)
-	mux.HandleFunc("/snippet/view", snippetView)
+	mux.HandleFunc("/", app.home)
+	mux.HandleFunc("/snippet/create", app.snippetCreate)
+	mux.HandleFunc("/snippet/view", app.snippetView)
 
 	// Chapter 3.2: The http.Server error log
 	// Initialize a new http.Server struct. We set the Addr and Handler fields so
