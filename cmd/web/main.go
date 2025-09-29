@@ -76,6 +76,13 @@ func main() {
 	// before the main() function exits.
 	defer db.Close()
 
+	// *Chapter 4.9: Transactions and other details |
+	// trying to add Prepared statements in my db
+	snippets, err := models.NewSnippetModel(db)
+	if err != nil {
+		errorLog.Fatal(err)
+	}
+
 	// Chapter 3.3: Dependency injection |
 	// Initialize a new instance of our application struct, containing the
 	// dependencies.
@@ -85,7 +92,7 @@ func main() {
 	app := &application{
 		errorLog: errorLog,
 		infoLog:  infoLog,
-		snippets: &models.SnippetModel{DB: db},
+		snippets: snippets,
 	}
 
 	// Chapter 3.2: The http.Server error log

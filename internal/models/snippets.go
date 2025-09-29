@@ -18,10 +18,63 @@ type Snippet struct {
 	expires time.Time
 }
 
+// *Chapter 4.9: Transactions and other details |
+// We need somewhere to store the prepared statement for the lifetime of our
+// web application. A neat way is to embed in the model alongside the connection
+// pool.
 // Chapter 4.5: Designing a database model |
 // Define a SnippetModel type which wraps a sql.DB connection pool.
 type SnippetModel struct {
-	DB *sql.DB
+	DB         *sql.DB
+	InsertStmt *sql.Stmt
+	GetStmt    *sql.Stmt
+	LatestStmt *sql.Stmt
+}
+
+// *Chapter 4.9: Transactions and other details |
+// Create a constructor for the model, in which we set up the prepared
+// statement.
+func NewSnippetModel(db *sql.DB) (*SnippetModel, error) {
+	// *Chapter 4.9: Transactions and other details |
+	// Use the Prepare method to create a new prepared statement for the
+	// current connection pool. This returns a sql.Stmt object which represents
+	// the prepared statement
+	var insertStmt, getStmt, latestStmt *sql.Stmt
+	var err error
+	insertStmt, err = db.Prepare(
+		`INSERT INTO snippets(title, content, created, expires)
+		VALUES(?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? DAY))`,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	getStmt, err = db.Prepare(
+		`SELECT id, title, content, created, expires
+		FROM snippets
+		WHERE expires > NOW() AND id = ?`,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	latestStmt, err = db.Prepare(
+		`SELECT id, title, content, created, expires
+		FROM snippets
+		ORDER BY id DESC LIMIT 10`,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// *Chapter 4.9: Transactions and other details |
+	// Store it in our SnippetModel object, alongside the connection pool.
+	return &SnippetModel{
+		DB:         db,
+		InsertStmt: insertStmt,
+		GetStmt:    getStmt,
+		LatestStmt: latestStmt,
+	}, nil
 }
 
 // Chapter 4.5: Designing a database model |
@@ -31,8 +84,8 @@ func (m *SnippetModel) Insert(title string, content string, expires int) (int, e
 	// Write the SQL statement we want to execute. I've split it over two lines
 	// for readability (which is why it's surrounded with backquotes instead
 	// of normal double quotes).
-	stmt := `INSERT INTO snippets(title, content, created, expires)
-	VALUES(?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? DAY))`
+	// stmt := `INSERT INTO snippets(title, content, created, expires)
+	// VALUES(?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? DAY))`
 
 	// Chapter 4.6: Executing SQL statements |
 	// Use the Exec() method on the embedded connection pool to execute the
@@ -40,7 +93,16 @@ func (m *SnippetModel) Insert(title string, content string, expires int) (int, e
 	// title, content and expiry values for placeholder parameters. This
 	// method returns a sql.Result type, which contains some basic
 	// information about what happened when the statement was executed.
-	result, err := m.DB.Exec(stmt, title, content, expires)
+	// result, err := m.DB.Exec(stmt, title, content, expires)
+	// if err != nil {
+	// 	return 0, err
+	// }
+
+	// *Chapter 4.9: Transactions and other details |
+	// Notice how we call Exec directly against the prepared statement, rather
+	// than against the connection pool? Prepared statements also support the
+	// Query and QueryRow methods
+	result, err := m.InsertStmt.Exec(title, content, expires)
 	if err != nil {
 		return 0, err
 	}
@@ -65,15 +127,18 @@ func (m *SnippetModel) Get(id int) (*Snippet, error) {
 	// Chapter 4.7: Single-record SQL queries |
 	// Write the SQL statement we want to execute. Again,I've split it over three
 	// lines for readability.
-	stmt := `SELECT id, title, content, created, expires
-	FROM snippets
-	WHERE expires > NOW() AND id = ?`
+	// stmt := `SELECT id, title, content, created, expires
+	// FROM snippets
+	// WHERE expires > NOW() AND id = ?`
 	// Chapter 4.7: Single-record SQL queries |
 	// Use the QueryRow() method on the connection pool to execute our
 	// SQL statement, passing in the untrusted id variable as the value for the
 	// placeholder parameter. This returns a pointer to a sql.Row object which
 	// holds the result from the database.
-	row := m.DB.QueryRow(stmt, id)
+	// row := m.DB.QueryRow(stmt, id)
+
+	// *Chapter 4.9: Transactions and other details |
+	row := m.GetStmt.QueryRow(id)
 
 	// Chapter 4.7: Single-record SQL queries
 	// Initialize a pointer to a new zeroed Snippet struct
@@ -108,16 +173,22 @@ func (m *SnippetModel) Get(id int) (*Snippet, error) {
 func (m *SnippetModel) Latest() ([]*Snippet, error) {
 	// Chapter 4.8: Multiple-record SQL queries |
 	//  Write the SQL statement we want to execute
-	stmt := `SELECT id, title, content, created, expires
-	FROM snippets
-	WHERE expires > NOW()
-	ORDER BY id DESC LIMIT 10`
+	// stmt := `SELECT id, title, content, created, expires
+	// FROM snippets
+	// WHERE expires > NOW()
+	// ORDER BY id DESC LIMIT 10`
 
 	// Chapter 4.8: Multiple-record SQL queries |
 	// Use the Query() method on the connection pool to execute our
 	// SQL statement. This returns a sql.Rows resultset containing the result of
 	// our query.
-	rows, err := m.DB.Query(stmt)
+	// rows, err := m.DB.Query(stmt)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// *Chapter 4.9: Transactions and other details |
+	rows, err := m.LatestStmt.Query()
 	if err != nil {
 		return nil, err
 	}
